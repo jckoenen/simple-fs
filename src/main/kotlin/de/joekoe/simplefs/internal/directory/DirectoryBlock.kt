@@ -40,6 +40,7 @@ internal class DirectoryBlock(
 
     fun addOrReplace(entry: DirectoryEntry) {
         if (entries.put(entry.relativeName, entry) != entry) {
+            check(entries.size <= MAX_ENTRIES) { "Maximum number of nodes per directory exceeded" }
             saveEntries()
         }
     }

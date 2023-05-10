@@ -7,7 +7,9 @@ import de.joekoe.simplefs.withTempFile
 import org.junit.jupiter.api.Test
 import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
 class DirectoryBlockTest {
@@ -86,4 +88,44 @@ class DirectoryBlockTest {
         assertEquals(1, afterDelete.size)
         assertEquals(fileA, afterDelete.single())
     }
+
+    @Test
+    fun `maximum number of entries should be persisted across files`() = withTempFile { raf, path ->
+        val entries = uniqueEntries().take(DirectoryBlock.MAX_ENTRIES).toSet()
+
+        val initialBlock = DirectoryBlock(raf.channel, 0)
+        entries.forEach(initialBlock::addOrReplace)
+        raf.close()
+
+        val afterReopen = FileChannel.open(path)
+            .use { DirectoryBlock(it, 0).allEntries() }
+            .toSet()
+
+        assertEquals(entries, afterReopen)
+    }
+
+    @Test
+    fun `writing more than allowed entries should fail`() = withTempFile { raf ->
+        val entries = uniqueEntries().take(DirectoryBlock.MAX_ENTRIES + 1).toSet()
+
+        val subject = DirectoryBlock(raf.channel, 0)
+        val ex = assertFails {
+            entries.forEach(subject::addOrReplace)
+        }
+        assertContains(ex.message.orEmpty(), "exceeded")
+    }
+
+    private fun uniqueEntries() =
+        generateSequence(buildString { repeat(Segment.SIZE_LIMIT) { append('a') } }) { it }
+            .mapIndexed { i, s ->
+                val toSet = i % 16
+                val toChange = Char(('a'.code + i / 16) + 1)
+
+                s.toCharArray()
+                    .apply { set(toSet, toChange) }
+                    .let(::String)
+            }
+            .map(Segment::of)
+            .map { DirectoryEntry.FilePointer(it, Long.MAX_VALUE, Long.MAX_VALUE) }
+            .distinct()
 }

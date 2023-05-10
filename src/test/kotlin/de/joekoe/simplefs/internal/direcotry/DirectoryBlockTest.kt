@@ -1,5 +1,6 @@
 package de.joekoe.simplefs.internal.direcotry
 
+import de.joekoe.simplefs.SimplePath.Segment
 import de.joekoe.simplefs.internal.directory.DirectoryBlock
 import de.joekoe.simplefs.internal.directory.DirectoryEntry
 import de.joekoe.simplefs.withTempFile
@@ -10,11 +11,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DirectoryBlockTest {
-    private val fileA = DirectoryEntry.FilePointer("fileA.txt", offset = 456, size = 123)
-    private val fileB = DirectoryEntry.FilePointer("fileB", offset = 0, size = 0)
+    private val fileA = DirectoryEntry.FilePointer(Segment.of("fileA.txt"), offset = 456, size = 123)
+    private val fileB = DirectoryEntry.FilePointer(Segment.of("fileB"), offset = 0, size = 0)
 
-    private val dirA = DirectoryEntry.DirectoryPointer("dirA", offset = 123)
-    private val dirB = DirectoryEntry.DirectoryPointer("dirB", offset = 255)
+    private val dirA = DirectoryEntry.DirectoryPointer(Segment.of("dirA"), offset = 123)
+    private val dirB = DirectoryEntry.DirectoryPointer(Segment.of("dirB"), offset = 255)
 
     @Test
     fun `empty blocks should be queryable`() = withTempFile { raf ->

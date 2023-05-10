@@ -2,7 +2,7 @@ package de.joekoe.simplefs
 
 import java.io.Closeable
 
-public typealias AbsolutePath = String
+public typealias AbsolutePath = SimplePath
 
 public interface SimpleFileSystem : Closeable {
     public fun createDirectory(path: AbsolutePath): DirectoryNode

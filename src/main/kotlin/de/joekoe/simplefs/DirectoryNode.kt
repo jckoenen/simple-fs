@@ -1,10 +1,15 @@
 package de.joekoe.simplefs
 
-public class DirectoryNode internal constructor() : SimpleFileSystemNode {
-    override val name: String
-        get() = TODO("Not yet implemented")
-    override val path: AbsolutePath
-        get() = TODO("Not yet implemented")
+import de.joekoe.simplefs.internal.directory.DirectoryBlock
+
+public class DirectoryNode internal constructor(
+    path: SimplePath,
+    internal val block: DirectoryBlock
+) : SimpleFileSystemNode {
+
+    override val name: String get() = absolutePath.fileName.toString()
+    override var absolutePath: SimplePath = path
+        internal set
 
     public fun createDirectory(name: String): DirectoryNode {
         TODO()

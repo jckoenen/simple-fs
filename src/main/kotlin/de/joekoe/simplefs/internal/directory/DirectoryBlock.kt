@@ -29,12 +29,12 @@ internal class DirectoryBlock(
                 append(DIR_TAG)
                 append(NEW_LINE)
             }.byteCount.toInt()
-            SimplePath.MAX_SEGMENT_SIZE + metadataSize
+            SimplePath.Segment.SIZE_LIMIT + metadataSize
         }
         private val BLOCK_SIZE = MAX_ENTRIES * ENTRY_SIZE.toLong()
     }
 
-    private val entries: MutableMap<String, DirectoryEntry> by lazy { loadEntries() }
+    private val entries: MutableMap<SimplePath.Segment, DirectoryEntry> by lazy { loadEntries() }
 
     fun allEntries() = entries.values.toList()
 
@@ -44,11 +44,13 @@ internal class DirectoryBlock(
         }
     }
 
-    fun delete(relativeName: String) {
+    fun delete(relativeName: SimplePath.Segment) {
         if (entries.remove(relativeName) != null) {
             saveEntries()
         }
     }
+
+    fun get(relativeName: SimplePath.Segment) = entries[relativeName]
 
     private fun loadEntries() =
         Channels.newReader(SimpleFsReadableChannel(fileChannel, start, BLOCK_SIZE), CHARSET)
@@ -57,8 +59,17 @@ internal class DirectoryBlock(
                     .map { line ->
                         val (tag, offset, size, name) = line.split(TAB)
                         when (tag.singleOrNull()) {
-                            DIR_TAG -> DirectoryPointer(name, offset.toLong())
-                            FILE_TAG -> FilePointer(name, offset.toLong(), size.toLong())
+                            DIR_TAG -> DirectoryPointer(
+                                relativeName = SimplePath.Segment.of(name),
+                                offset = offset.toLong()
+                            )
+
+                            FILE_TAG -> FilePointer(
+                                relativeName = SimplePath.Segment.of(name),
+                                offset = offset.toLong(),
+                                size = size.toLong()
+                            )
+
                             else -> error("Unexpected Tag $tag")
                         }
                     }

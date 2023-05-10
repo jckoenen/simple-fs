@@ -1,9 +1,8 @@
 package de.joekoe.simplefs.internal
 
-import de.joekoe.simplefs.byteCount
+import de.joekoe.simplefs.consumeText
 import de.joekoe.simplefs.withTempFile
 import org.junit.jupiter.api.Test
-import java.nio.channels.Channels
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.test.assertEquals
@@ -27,7 +26,7 @@ class SimpleFsReadableChannelTest {
 
     @Test
     fun `close should not close underlying channel`() = withTempFile { raf ->
-        val subject = SimpleFsReadableChannel(raf.channel, 0, 0) {}
+        val subject = SimpleFsReadableChannel(raf.channel, 0, 0)
         assertTrue(subject.isOpen)
 
         subject.close()
@@ -42,14 +41,13 @@ class SimpleFsReadableChannelTest {
         raf.writeBytes(foo)
         raf.writeBytes(bar)
 
-        val fooChannel = SimpleFsReadableChannel(raf.channel, 0, foo.byteCount) {}
-        val actualFoo = Channels.newReader(fooChannel, Charsets.UTF_8)
-            .use { it.readText() }
+        val actualFoo = SimpleFsReadableChannel(raf.channel, 0, foo.byteCount)
+            .consumeText()
         assertEquals(foo, actualFoo)
 
-        val barChannel = SimpleFsReadableChannel(raf.channel, foo.byteCount, bar.byteCount) {}
-        val actualBar = Channels.newReader(barChannel, Charsets.UTF_8)
-            .use { it.readText() }
+        val actualBar = SimpleFsReadableChannel(raf.channel, foo.byteCount, bar.byteCount)
+            .consumeText()
+
         assertEquals(bar, actualBar)
     }
 }

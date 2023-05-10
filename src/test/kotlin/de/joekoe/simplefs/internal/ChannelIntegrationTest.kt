@@ -1,5 +1,6 @@
 package de.joekoe.simplefs.internal
 
+import de.joekoe.simplefs.consumeText
 import de.joekoe.simplefs.withTempFile
 import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
@@ -17,10 +18,9 @@ class ChannelIntegrationTest {
         val text = "Hello, World!"
         SimpleFsWritableChannel(raf.channel, 0) { written = it }
             .use { it.write(ByteBuffer.wrap(text.toByteArray())) }
-        val rc = SimpleFsReadableChannel(raf.channel, 0, written) {}
 
-        val actual = Channels.newReader(rc, Charsets.UTF_8)
-            .use { it.readText() }
+        val actual = SimpleFsReadableChannel(raf.channel, 0, written)
+            .consumeText()
 
         assertEquals(text, actual)
     }
@@ -35,10 +35,9 @@ class ChannelIntegrationTest {
             .use { fc ->
                 SimpleFsWritableChannel(raf.channel, 0) { written = it }
                     .use { wc -> fc.transferTo(0, fc.size(), wc) }
-                val rc = SimpleFsReadableChannel(raf.channel, 0, written) {}
 
-                val actual = Channels.newReader(rc, Charsets.UTF_8)
-                    .use { it.readText() }
+                val actual = SimpleFsReadableChannel(raf.channel, 0, written)
+                    .consumeText()
                 val expect = Channels.newReader(fc, Charsets.UTF_8)
                     .readText()
 

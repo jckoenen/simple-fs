@@ -1,6 +1,5 @@
 package de.joekoe.simplefs.internal
 
-import de.joekoe.simplefs.byteCount
 import de.joekoe.simplefs.withTempFile
 import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer

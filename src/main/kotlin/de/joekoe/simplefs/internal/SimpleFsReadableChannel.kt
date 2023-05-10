@@ -10,7 +10,7 @@ internal class SimpleFsReadableChannel(
     private val underlying: FileChannel,
     private val start: Long,
     private val size: Long,
-    private val onClose: () -> Unit
+    private val onClose: () -> Unit = {}
 ) : ReadableByteChannel {
     private var read = 0L
     private val open = AtomicBoolean(true)

@@ -23,7 +23,7 @@ class SingleFileFileSystemTest {
             .asSequence()
             .filterNot {
                 val relative = it.toString()
-                relative.isBlank() || relative.startsWith("build/test-results")
+                relative.isBlank() || relative.startsWith("build/test-results") || relative.startsWith(".gradle")
             }
 
     @Test

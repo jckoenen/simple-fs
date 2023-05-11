@@ -26,59 +26,18 @@ class SingleFileFileSystemTest {
     fun `copying project folder should preserve content`() = withFileSystem { subject, _ ->
         copyProjectToFileSystem(subject)
 
-        allFilesInProject()
-            .forEach { path ->
-                val sp = SimplePath.of(path.toString())
-                when {
-                    path.isDirectory() -> assertIs<DirectoryNode>(subject.open(sp))
-                    path.isRegularFile() -> {
-                        val expected = Files.readAllBytes(path)
-                        val copy = subject.open(sp)
-                        assertIs<FileNode>(copy)
-                        val actual = copy.readChannel().consumeBytes()
-
-                        assertEquals(expected.size, actual.size)
-                        expected.zip(actual)
-                            .forEach { (expectedByte, actualByte) ->
-                                assertEquals(expectedByte, actualByte)
-                            }
-                    }
-
-                    else -> error("Skipping path $path - neither file nor directory")
-                }
-            }
+        compareProjectWithFs(subject)
     }
 
     @Test
     fun `copying project folder should preserve content across closing`() = withFileSystem { beforeClose, fsPath ->
         copyProjectToFileSystem(beforeClose)
         beforeClose.close()
-        val reopened = SimpleFileSystem(fsPath)
 
-        allFilesInProject()
-            .forEach { path ->
-                val sp = SimplePath.of(path.toString())
-                when {
-                    path.isDirectory() -> assertIs<DirectoryNode>(reopened.open(sp))
-                    path.isRegularFile() -> {
-                        val expected = Files.readAllBytes(path)
-                        val copy = reopened.open(sp)
-                        assertIs<FileNode>(copy)
-                        val actual = copy.readChannel().consumeBytes()
-
-                        assertEquals(expected.size, actual.size)
-                        expected.zip(actual)
-                            .forEach { (expectedByte, actualByte) ->
-                                assertEquals(expectedByte, actualByte)
-                            }
-                    }
-
-                    else -> error("Skipping path $path - neither file nor directory")
-                }
-            }
+        SimpleFileSystem(fsPath).use(::compareProjectWithFs)
     }
 
-    private fun copyProjectToFileSystem(fs: SingleFileFileSystem) {
+    private fun copyProjectToFileSystem(fs: SimpleFileSystem) {
         allFilesInProject()
             .forEach { path ->
                 val sp = SimplePath.of(path.toString())
@@ -96,4 +55,27 @@ class SingleFileFileSystemTest {
                 }
             }
     }
+
+    private fun compareProjectWithFs(fs: SimpleFileSystem) =
+        allFilesInProject()
+            .forEach { path ->
+                val sp = SimplePath.of(path.toString())
+                when {
+                    path.isDirectory() -> assertIs<DirectoryNode>(fs.open(sp))
+                    path.isRegularFile() -> {
+                        val expected = Files.readAllBytes(path)
+                        val copy = fs.open(sp)
+                        assertIs<FileNode>(copy)
+                        val actual = copy.readChannel().consumeBytes()
+
+                        assertEquals(expected.size, actual.size)
+                        expected.zip(actual)
+                            .forEach { (expectedByte, actualByte) ->
+                                assertEquals(expectedByte, actualByte)
+                            }
+                    }
+
+                    else -> error("Skipping path $path - neither file nor directory")
+                }
+            }
 }

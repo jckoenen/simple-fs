@@ -26,7 +26,7 @@ public value class SimplePath private constructor(
 
     public val lastSegment: Segment get() = segments.last()
 
-    internal val segmentCount get() = segments.size
+    private val segmentCount get() = segments.size
 
     internal fun parent(): SimplePath? = when (segmentCount) {
         0 -> null

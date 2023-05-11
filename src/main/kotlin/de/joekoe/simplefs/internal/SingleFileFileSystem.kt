@@ -127,7 +127,7 @@ internal class SingleFileFileSystem(
             }
             ?: root
 
-    internal fun blockAt(path: AbsolutePath, parent: DirectoryBlock): DirectoryBlock? =
+    private fun blockAt(path: AbsolutePath, parent: DirectoryBlock): DirectoryBlock? =
         blocks.computeIfAbsent(path) {
             val pointer = parent.get(path.lastSegment) as? DirectoryPointer
             pointer?.let { DirectoryBlock(channel, it.offset, path) }

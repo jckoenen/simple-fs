@@ -1,6 +1,7 @@
 package de.joekoe.simplefs.internal
 
 import de.joekoe.simplefs.consumeText
+import de.joekoe.simplefs.copyTo
 import de.joekoe.simplefs.withTempFile
 import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
@@ -34,7 +35,7 @@ class ChannelIntegrationTest {
         FileChannel.open(thisFile)
             .use { fc ->
                 SimpleFsWritableChannel(raf.channel, 0) { written = it }
-                    .use { wc -> fc.transferTo(0, fc.size(), wc) }
+                    .use { wc -> fc.copyTo(wc) }
 
                 val actual = SimpleFsReadableChannel(raf.channel, 0, written)
                     .consumeText()

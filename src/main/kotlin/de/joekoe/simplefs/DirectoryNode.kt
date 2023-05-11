@@ -15,7 +15,7 @@ public class DirectoryNode internal constructor(
         internal set
 
     private fun requireNotDeleted() =
-        requireNotNull(parent.get(absolutePath.lastSegment) as? DirectoryEntry.DirectoryPointer) {
+        checkNotNull(parent.get(absolutePath.lastSegment) as? DirectoryEntry.DirectoryPointer) {
             "Directory has already been deleted"
         }
 
@@ -31,6 +31,15 @@ public class DirectoryNode internal constructor(
         return fileSystem.createFile(absolutePath.child(name))
     }
 
+    public fun children(): Sequence<SimpleFileSystemNode> =
+        requireNotNull(fileSystem.blockAt(absolutePath, parent))
+            .allEntries()
+            .asSequence()
+            .mapNotNull { e ->
+                val path = absolutePath.child(e.relativeName)
+                fileSystem.open(path)
+            }
+
     override fun moveTo(directory: DirectoryNode) {
         parent = fileSystem.moveTo(this, directory.absolutePath)
         absolutePath = directory.absolutePath.child(absolutePath.lastSegment)
@@ -42,5 +51,21 @@ public class DirectoryNode internal constructor(
 
     override fun delete() {
         fileSystem.delete(this)
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as DirectoryNode
+
+        if (fileSystem != other.fileSystem) return false
+        return absolutePath == other.absolutePath
+    }
+
+    override fun hashCode(): Int {
+        var result = fileSystem.hashCode()
+        result = 31 * result + absolutePath.hashCode()
+        return result
     }
 }

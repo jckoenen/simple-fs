@@ -1,8 +1,8 @@
 package de.joekoe.simplefs
 
 import de.joekoe.simplefs.SimplePath.Segment
-import de.joekoe.simplefs.internal.SingleFileFileSystem
 import org.junit.jupiter.api.Test
+import java.nio.ByteBuffer
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -10,22 +10,15 @@ import kotlin.test.assertFailsWith
 class DirectoryNodeTest {
     private inline fun test(
         f: (subject: DirectoryNode) -> Unit
-    ) = withTempFile { raf ->
-        val fs = SingleFileFileSystem(raf)
-        val path = SimplePath.of("subject")
-
-        val subject = fs.createDirectory(path)
-
-        f(subject)
-    }
+    ) = withFileSystem { f(it.createDirectory(SimplePath.of("foo"))) }
 
     @Test
     fun `operations should fail if this directory was already deleted`() = test { subject ->
         subject.delete()
 
-        assertFailsWith<IllegalArgumentException> { subject.createFile(Segment.of("foo")) }
-        assertFailsWith<IllegalArgumentException> { subject.createDirectory(Segment.of("foo")) }
-        assertFailsWith<IllegalArgumentException> { subject.rename(Segment.of("foo")) }
+        assertFailsWith<IllegalStateException> { subject.createFile(Segment.of("foo")) }
+        assertFailsWith<IllegalStateException> { subject.createDirectory(Segment.of("foo")) }
+        assertFailsWith<IllegalStateException> { subject.rename(Segment.of("foo")) }
     }
 
     @Test
@@ -50,5 +43,22 @@ class DirectoryNodeTest {
         assertEquals(expectedPath, childA.absolutePath)
         val existsFailure = assertFailsWith<IllegalArgumentException> { childB.createDirectory(segmentA) }
         assertContains(existsFailure.message.orEmpty(), "exists")
+    }
+
+    @Test
+    fun `renaming should not affect content`() = test { subject ->
+        val child = subject.createFile(Segment.of("child"))
+
+        child.writeChannel().use { it.write(ByteBuffer.wrap("Hello, World".toByteArray())) }
+        val contentBefore = child.readChannel().consumeText()
+        val childrenBefore = subject.children().toList().map { it.name }
+
+        subject.rename(Segment.of("another name"))
+
+        val childrenAfter = subject.children().toList().map { it.name }
+        val contentAfter = child.readChannel().consumeText()
+
+        assertEquals(childrenBefore, childrenAfter)
+        assertEquals(contentBefore, contentAfter)
     }
 }

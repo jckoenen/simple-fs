@@ -20,7 +20,9 @@ internal class SingleFileFileSystem(
     private val channel: FileChannel = container.channel
 
     private val root = DirectoryBlock(channel, 0)
-    private val blocks = mutableMapOf<SimplePath, DirectoryBlock?>()
+    private val blocks = mutableMapOf<SimplePath, DirectoryBlock?>().also {
+        it[SimplePath.ROOT] = root
+    }
 
     override fun createDirectory(path: AbsolutePath): DirectoryNode {
         val parent = requireNotNull(parentBlockOf(path)) {
@@ -83,7 +85,7 @@ internal class SingleFileFileSystem(
             "Target directory doesn't exist"
         }
         val oldPointer = checkNotNull(oldParent.get(node.absolutePath.lastSegment)) {
-            "Node no longer linked to parent"
+            "Node already deleted"
         }
 
         newParent.addOrReplace(oldPointer)
@@ -125,7 +127,7 @@ internal class SingleFileFileSystem(
             }
             ?: root
 
-    private fun blockAt(path: AbsolutePath, parent: DirectoryBlock): DirectoryBlock? =
+    internal fun blockAt(path: AbsolutePath, parent: DirectoryBlock): DirectoryBlock? =
         blocks.computeIfAbsent(path) {
             val pointer = parent.get(path.lastSegment) as? DirectoryPointer
             pointer?.let { DirectoryBlock(channel, it.offset) }

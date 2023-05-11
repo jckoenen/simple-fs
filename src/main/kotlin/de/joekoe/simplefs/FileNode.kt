@@ -22,7 +22,7 @@ public class FileNode internal constructor(
         internal set
 
     private fun requireNotDeleted() =
-        requireNotNull(parent.get(absolutePath.lastSegment) as? DirectoryEntry.FilePointer) {
+        checkNotNull(parent.get(absolutePath.lastSegment) as? DirectoryEntry.FilePointer) {
             "File has already been deleted"
         }
 
@@ -59,10 +59,28 @@ public class FileNode internal constructor(
     }
 
     override fun rename(name: SimplePath.Segment) {
+        requireNotDeleted()
+
         absolutePath = fileSystem.rename(this, name)
     }
 
     override fun delete() {
         fileSystem.delete(this)
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as FileNode
+
+        if (fileSystem != other.fileSystem) return false
+        return absolutePath == other.absolutePath
+    }
+
+    override fun hashCode(): Int {
+        var result = fileSystem.hashCode()
+        result = 31 * result + absolutePath.hashCode()
+        return result
     }
 }

@@ -57,8 +57,13 @@ class SimplePathTest {
     }
 
     @Test
-    fun `parent should return null if parent is root`() {
-        assertEquals(null, SimplePath.of("/1").parent())
+    fun `parent should return ROOT if parent is root`() {
+        assertEquals(SimplePath.ROOT, SimplePath.of("/1").parent())
+    }
+
+    @Test
+    fun `parent should return null if current is root`() {
+        assertEquals(null, SimplePath.ROOT.parent())
     }
 
     @Test

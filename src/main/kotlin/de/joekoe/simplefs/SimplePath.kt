@@ -28,8 +28,11 @@ public value class SimplePath private constructor(
 
     internal val segmentCount get() = segments.size
 
-    internal fun parent(): SimplePath? =
-        if (segmentCount == 1) null else SimplePath(segments.dropLast(1))
+    internal fun parent(): SimplePath? = when (segmentCount) {
+        0 -> null
+        1 -> ROOT
+        else -> SimplePath(segments.dropLast(1))
+    }
 
     internal fun child(segment: Segment) = SimplePath(segments + segment)
 
@@ -44,6 +47,8 @@ public value class SimplePath private constructor(
 
     public companion object {
         public const val DELIMITER: Char = '/'
+
+        public val ROOT: SimplePath = SimplePath(emptyList())
 
         public fun of(path: String): SimplePath =
             path.split(DELIMITER)

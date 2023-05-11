@@ -18,13 +18,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class SingleFileFileSystemTest {
+
+    private val ignoredFolders = listOf(
+        "build/test-results", // fails on any stdout/sterr output. gradle writes them to a file
+        ".gradle", // fails on windows due to file lock
+        "build/classes/kotlin/test", // inline functions create class files, the test names won't fit into a segment
+        "build/kotlin" // cache files on windows can exceed the node limit per directory
+    )
+
     private fun allFilesInProject() =
         Files.walk(Path(""))
             .asSequence()
-            .filterNot {
-                val relative = it.toString()
-                relative.isBlank() || relative.startsWith("build/test-results") || relative.startsWith(".gradle")
-            }
+            .drop(1) // ignore the root
+            .filterNot { ignoredFolders.any(it::startsWith) }
 
     @Test
     fun `copying project folder should preserve content`() = withFileSystem { subject, _ ->

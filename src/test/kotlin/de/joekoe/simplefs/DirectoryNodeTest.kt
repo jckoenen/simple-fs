@@ -10,14 +10,14 @@ import kotlin.test.assertFailsWith
 class DirectoryNodeTest {
     private inline fun test(
         f: (subject: DirectoryNode) -> Unit
-    ) = withFileSystem { f(it.createDirectory(SimplePath.of("foo"))) }
+    ) = withFileSystem { fs -> f(fs.createDirectory(SimplePath.of("foo"))) }
 
     @Test
     fun `operations should fail if this directory was already deleted`() = test { subject ->
         subject.delete()
 
-        assertFailsWith<IllegalStateException> { subject.createFile(Segment.of("foo")) }
-        assertFailsWith<IllegalStateException> { subject.createDirectory(Segment.of("foo")) }
+        assertFailsWith<IllegalArgumentException> { subject.createFile(Segment.of("foo")) }
+        assertFailsWith<IllegalArgumentException> { subject.createDirectory(Segment.of("foo")) }
         assertFailsWith<IllegalStateException> { subject.rename(Segment.of("foo")) }
     }
 

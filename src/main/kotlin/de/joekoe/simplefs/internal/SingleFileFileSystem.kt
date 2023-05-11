@@ -19,7 +19,7 @@ internal class SingleFileFileSystem(
 
     private val channel: FileChannel = container.channel
 
-    private val root = DirectoryBlock(channel, 0)
+    private val root = DirectoryBlock(channel, 0, SimplePath.ROOT)
     private val blocks = mutableMapOf<SimplePath, DirectoryBlock?>().also {
         it[SimplePath.ROOT] = root
     }
@@ -33,11 +33,11 @@ internal class SingleFileFileSystem(
         }
 
         val pos = channel.size()
-        val block = DirectoryBlock(channel, pos)
+        val block = DirectoryBlock(channel, pos, path)
         parent.addOrReplace(DirectoryPointer(path.lastSegment, pos))
         blocks[path] = block
 
-        return DirectoryNode(path, parent, this)
+        return DirectoryNode(block, this)
     }
 
     override fun createFile(path: AbsolutePath): FileNode {
@@ -51,7 +51,7 @@ internal class SingleFileFileSystem(
         val pos = channel.size()
         parent.addOrReplace(FilePointer(path.lastSegment, pos, 0))
 
-        return FileNode(path, channel, parent, this)
+        return FileNode(path.lastSegment, channel, parent, this)
     }
 
     override fun open(path: AbsolutePath): SimpleFileSystemNode? {
@@ -59,21 +59,20 @@ internal class SingleFileFileSystem(
         return when (parent.get(path.lastSegment)) {
             null -> null
             is FilePointer -> FileNode(
-                initialPath = path,
+                segment = path.lastSegment,
                 fileChannel = channel,
                 parent = parent,
                 fileSystem = this
             )
 
             is DirectoryPointer -> DirectoryNode(
-                initialPath = path,
-                parent = parent,
+                block = requireNotNull(blockAt(path, parent)),
                 fileSystem = this
             )
         }
     }
 
-    internal fun moveTo(node: SimpleFileSystemNode, path: AbsolutePath): DirectoryBlock {
+    internal fun moveTo(node: SimpleFileSystemNode, path: AbsolutePath): Pair<AbsolutePath, DirectoryBlock> {
         val notRecursive = path.allSubPaths()
             .none { it == node.absolutePath }
         require(notRecursive) { "Can't move this node to a child directory" }
@@ -90,11 +89,12 @@ internal class SingleFileFileSystem(
 
         newParent.addOrReplace(oldPointer)
         oldParent.delete(node.absolutePath.lastSegment)
+        val newPath = path.child(node.absolutePath.lastSegment)
         blocks.remove(node.absolutePath)?.let {
             blocks[path.child(node.absolutePath.lastSegment)] = it
         }
 
-        return newParent
+        return newPath to newParent
     }
 
     internal fun rename(node: SimpleFileSystemNode, name: SimplePath.Segment): AbsolutePath {
@@ -130,7 +130,7 @@ internal class SingleFileFileSystem(
     internal fun blockAt(path: AbsolutePath, parent: DirectoryBlock): DirectoryBlock? =
         blocks.computeIfAbsent(path) {
             val pointer = parent.get(path.lastSegment) as? DirectoryPointer
-            pointer?.let { DirectoryBlock(channel, it.offset) }
+            pointer?.let { DirectoryBlock(channel, it.offset, path) }
         }
 
     override fun compact() {

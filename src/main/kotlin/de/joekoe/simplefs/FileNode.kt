@@ -11,15 +11,14 @@ import java.nio.channels.ReadableByteChannel
 import java.nio.channels.WritableByteChannel
 
 public class FileNode internal constructor(
-    initialPath: AbsolutePath,
+    private var segment: SimplePath.Segment,
     private val fileChannel: FileChannel,
     private var parent: DirectoryBlock,
     private val fileSystem: SingleFileFileSystem
 ) : SimpleFileSystemNode {
 
-    override val name: String get() = absolutePath.lastSegment.toString()
-    override var absolutePath: AbsolutePath = initialPath
-        internal set
+    override val name: String get() = segment.toString()
+    override val absolutePath: AbsolutePath get() = parent.absolutePath.child(segment)
 
     private fun requireNotDeleted() =
         checkNotNull(parent.get(absolutePath.lastSegment) as? DirectoryEntry.FilePointer) {
@@ -54,14 +53,14 @@ public class FileNode internal constructor(
     }
 
     override fun moveTo(directory: DirectoryNode) {
-        parent = fileSystem.moveTo(this, directory.absolutePath)
-        absolutePath = directory.absolutePath.child(absolutePath.lastSegment)
+        parent = fileSystem.moveTo(this, directory.absolutePath).second
     }
 
     override fun rename(name: SimplePath.Segment) {
         requireNotDeleted()
 
-        absolutePath = fileSystem.rename(this, name)
+        fileSystem.rename(this, name)
+        segment = name
     }
 
     override fun delete() {

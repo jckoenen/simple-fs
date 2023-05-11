@@ -1,5 +1,6 @@
 package de.joekoe.simplefs.internal.directory
 
+import de.joekoe.simplefs.AbsolutePath
 import de.joekoe.simplefs.SimplePath
 import de.joekoe.simplefs.internal.SimpleFsReadableChannel
 import de.joekoe.simplefs.internal.SimpleFsWritableChannel
@@ -12,7 +13,8 @@ import java.nio.channels.FileChannel
 
 internal class DirectoryBlock(
     private val fileChannel: FileChannel,
-    private val start: Long
+    private val start: Long,
+    internal var absolutePath: AbsolutePath
 ) {
     companion object {
         const val MAX_ENTRIES = 255

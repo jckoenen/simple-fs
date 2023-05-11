@@ -1,5 +1,6 @@
 package de.joekoe.simplefs.internal.direcotry
 
+import de.joekoe.simplefs.SimplePath
 import de.joekoe.simplefs.SimplePath.Segment
 import de.joekoe.simplefs.internal.directory.DirectoryBlock
 import de.joekoe.simplefs.internal.directory.DirectoryEntry
@@ -21,12 +22,12 @@ class DirectoryBlockTest {
 
     @Test
     fun `empty blocks should be queryable`() = withTempFile { raf ->
-        assertTrue(DirectoryBlock(raf.channel, 0).allEntries().isEmpty())
+        assertTrue(DirectoryBlock(raf.channel, 0, SimplePath.ROOT).allEntries().isEmpty())
     }
 
     @Test
     fun `should read and write single file entry correctly`() = withTempFile { raf ->
-        val subject = DirectoryBlock(raf.channel, 0)
+        val subject = DirectoryBlock(raf.channel, 0, SimplePath.ROOT)
         subject.addOrReplace(fileA)
 
         assertEquals(fileA, subject.allEntries().single())
@@ -34,7 +35,7 @@ class DirectoryBlockTest {
 
     @Test
     fun `should delete file entry correctly`() = withTempFile { raf ->
-        val subject = DirectoryBlock(raf.channel, 0)
+        val subject = DirectoryBlock(raf.channel, 0, SimplePath.ROOT)
         subject.addOrReplace(fileA)
         subject.delete(fileA.relativeName)
 
@@ -43,7 +44,7 @@ class DirectoryBlockTest {
 
     @Test
     fun `should read and write single directory entry correctly`() = withTempFile { raf ->
-        val subject = DirectoryBlock(raf.channel, 0)
+        val subject = DirectoryBlock(raf.channel, 0, SimplePath.ROOT)
         subject.addOrReplace(dirA)
 
         assertEquals(dirA, subject.allEntries().single())
@@ -51,7 +52,7 @@ class DirectoryBlockTest {
 
     @Test
     fun `should delete directory entry correctly`() = withTempFile { raf ->
-        val subject = DirectoryBlock(raf.channel, 0)
+        val subject = DirectoryBlock(raf.channel, 0, SimplePath.ROOT)
         subject.addOrReplace(dirA)
         subject.delete(dirA.relativeName)
 
@@ -60,7 +61,7 @@ class DirectoryBlockTest {
 
     @Test
     fun `should read and write multiple heterogeneous entries correctly`() = withTempFile { raf ->
-        val subject = DirectoryBlock(raf.channel, 0)
+        val subject = DirectoryBlock(raf.channel, 0, SimplePath.ROOT)
         val data = listOf(fileA, dirB, dirA, fileB)
         data.forEach(subject::addOrReplace)
 
@@ -70,19 +71,19 @@ class DirectoryBlockTest {
     @Test
     fun `entries should be persisted across closed files`() = withTempFile { raf, path ->
         val data = listOf(fileA, dirB)
-        data.forEach(DirectoryBlock(raf.channel, 0)::addOrReplace)
+        data.forEach(DirectoryBlock(raf.channel, 0, SimplePath.ROOT)::addOrReplace)
         raf.close()
 
         val beforeDelete = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE)
             .use {
-                val b = DirectoryBlock(it, 0)
+                val b = DirectoryBlock(it, 0, SimplePath.ROOT)
                 val entries = b.allEntries()
                 b.delete(dirB.relativeName)
                 entries
             }
 
         val afterDelete = FileChannel.open(path)
-            .use { DirectoryBlock(it, 0).allEntries() }
+            .use { DirectoryBlock(it, 0, SimplePath.ROOT).allEntries() }
 
         assertTrue(beforeDelete.containsAll(data))
         assertEquals(1, afterDelete.size)
@@ -93,12 +94,12 @@ class DirectoryBlockTest {
     fun `maximum number of entries should be persisted across files`() = withTempFile { raf, path ->
         val entries = uniqueEntries().take(DirectoryBlock.MAX_ENTRIES).toSet()
 
-        val initialBlock = DirectoryBlock(raf.channel, 0)
+        val initialBlock = DirectoryBlock(raf.channel, 0, SimplePath.ROOT)
         entries.forEach(initialBlock::addOrReplace)
         raf.close()
 
         val afterReopen = FileChannel.open(path)
-            .use { DirectoryBlock(it, 0).allEntries() }
+            .use { DirectoryBlock(it, 0, SimplePath.ROOT).allEntries() }
             .toSet()
 
         assertEquals(entries, afterReopen)
@@ -108,7 +109,7 @@ class DirectoryBlockTest {
     fun `writing more than allowed entries should fail`() = withTempFile { raf ->
         val entries = uniqueEntries().take(DirectoryBlock.MAX_ENTRIES + 1).toSet()
 
-        val subject = DirectoryBlock(raf.channel, 0)
+        val subject = DirectoryBlock(raf.channel, 0, SimplePath.ROOT)
         val ex = assertFails {
             entries.forEach(subject::addOrReplace)
         }

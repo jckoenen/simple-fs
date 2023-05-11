@@ -2,37 +2,25 @@ package de.joekoe.simplefs
 
 import de.joekoe.simplefs.internal.SingleFileFileSystem
 import de.joekoe.simplefs.internal.directory.DirectoryBlock
-import de.joekoe.simplefs.internal.directory.DirectoryEntry
 
 public class DirectoryNode internal constructor(
-    initialPath: AbsolutePath,
-    private var parent: DirectoryBlock,
+    private val block: DirectoryBlock,
     private val fileSystem: SingleFileFileSystem
 ) : SimpleFileSystemNode {
 
-    override val name: String get() = absolutePath.lastSegment.toString()
-    override var absolutePath: AbsolutePath = initialPath
-        internal set
+    override val name: String
+        get() = if (absolutePath == SimplePath.ROOT) "/" else absolutePath.lastSegment.toString()
 
-    private fun requireNotDeleted() =
-        checkNotNull(parent.get(absolutePath.lastSegment) as? DirectoryEntry.DirectoryPointer) {
-            "Directory has already been deleted"
-        }
+    override val absolutePath: AbsolutePath get() = block.absolutePath
 
-    public fun createDirectory(name: SimplePath.Segment): DirectoryNode {
-        requireNotDeleted()
+    public fun createDirectory(name: SimplePath.Segment): DirectoryNode =
+        fileSystem.createDirectory(absolutePath.child(name))
 
-        return fileSystem.createDirectory(absolutePath.child(name))
-    }
-
-    public fun createFile(name: SimplePath.Segment): FileNode {
-        requireNotDeleted()
-
-        return fileSystem.createFile(absolutePath.child(name))
-    }
+    public fun createFile(name: SimplePath.Segment): FileNode =
+        fileSystem.createFile(absolutePath.child(name))
 
     public fun children(): Sequence<SimpleFileSystemNode> =
-        requireNotNull(fileSystem.blockAt(absolutePath, parent))
+        block
             .allEntries()
             .asSequence()
             .mapNotNull { e ->
@@ -41,12 +29,12 @@ public class DirectoryNode internal constructor(
             }
 
     override fun moveTo(directory: DirectoryNode) {
-        parent = fileSystem.moveTo(this, directory.absolutePath)
-        absolutePath = directory.absolutePath.child(absolutePath.lastSegment)
+        require(absolutePath != SimplePath.ROOT) { "Cannot move root directory" }
+        block.absolutePath = fileSystem.moveTo(this, directory.absolutePath).first
     }
 
     override fun rename(name: SimplePath.Segment) {
-        absolutePath = fileSystem.rename(this, name)
+        fileSystem.rename(this, name)
     }
 
     override fun delete() {

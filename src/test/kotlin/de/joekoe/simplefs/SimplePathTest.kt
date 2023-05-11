@@ -14,7 +14,7 @@ class SimplePathTest {
         assertFails { SimplePath.Segment.of("foo\tbal") }
         assertFails {
             SimplePath.Segment.of(
-                buildString { repeat(100) { append('a') } }
+                buildString { repeat(SimplePath.Segment.SIZE_LIMIT + 5) { append('a') } }
             )
         }
     }
@@ -29,9 +29,9 @@ class SimplePathTest {
     }
 
     @Test
-    fun `creating empty Path should fail`() {
-        assertFails { SimplePath.of("") }
-        assertFails { SimplePath.of("/") }
+    fun `creating empty Path should return root`() {
+        assertEquals(SimplePath.ROOT, SimplePath.of(""))
+        assertEquals(SimplePath.ROOT, SimplePath.of("/"))
     }
 
     @Test

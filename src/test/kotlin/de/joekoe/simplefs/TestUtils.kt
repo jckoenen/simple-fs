@@ -2,6 +2,7 @@ package de.joekoe.simplefs
 
 import de.joekoe.simplefs.internal.SingleFileFileSystem
 import java.io.File
+import java.io.InputStream
 import java.io.RandomAccessFile
 import java.io.Reader
 import java.nio.channels.Channels
@@ -26,6 +27,10 @@ internal inline fun withTempFile(test: (raf: RandomAccessFile) -> Unit) = withTe
 internal fun ReadableByteChannel.consumeText() =
     Channels.newReader(this, Charsets.UTF_8)
         .use(Reader::readText)
+
+internal fun ReadableByteChannel.consumeBytes() =
+    Channels.newInputStream(this)
+        .use(InputStream::readAllBytes)
 
 internal fun FileChannel.copyTo(channel: WritableByteChannel) {
     var written = 0L

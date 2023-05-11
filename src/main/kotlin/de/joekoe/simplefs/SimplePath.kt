@@ -12,7 +12,7 @@ public value class SimplePath private constructor(
         override fun toString(): String = underlying
 
         public companion object {
-            internal const val SIZE_LIMIT = 64
+            internal const val SIZE_LIMIT = 128
 
             public fun of(s: String): Segment {
                 check(s.isNotBlank()) { "Path segment must not be blank" }
@@ -53,8 +53,9 @@ public value class SimplePath private constructor(
         public fun of(path: String): SimplePath =
             path.split(DELIMITER)
                 .dropWhile(String::isBlank) // ignore leading delimiters
-                .also { require(it.isNotEmpty()) { "Path cannot be empty" } }
-                .map(Segment::of)
-                .let(::SimplePath)
+                .takeUnless(List<*>::isEmpty)
+                ?.map(Segment::of)
+                ?.let(::SimplePath)
+                ?: ROOT
     }
 }

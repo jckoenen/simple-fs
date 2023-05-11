@@ -4,7 +4,8 @@ import de.joekoe.simplefs.internal.byteCount
 
 @JvmInline
 public value class SimplePath private constructor(
-    public val segments: List<Segment>
+    /* for testing, else private */
+    internal val segments: List<Segment>
 ) {
     @JvmInline
     public value class Segment private constructor(private val underlying: String) {
@@ -12,22 +13,28 @@ public value class SimplePath private constructor(
 
         public companion object {
             internal const val SIZE_LIMIT = 64
+
             public fun of(s: String): Segment {
                 check(s.isNotBlank()) { "Path segment must not be blank" }
                 check('\t' !in s) { "Illegal tab character in segment \"$s\"" }
+                check(DELIMITER !in s) { "Illegal delimiter character \"$DELIMITER\" in segment \"$s\"" }
                 check(s.byteCount <= SIZE_LIMIT) { "Path segment \"$s\" is too long" }
                 return Segment(s)
             }
         }
     }
 
-    public val fileName: Segment get() = segments.last()
+    public val lastSegment: Segment get() = segments.last()
+
+    internal val segmentCount get() = segments.size
 
     internal fun parent(): SimplePath? =
-        if (segments.size == 1) null else SimplePath(segments.dropLast(1))
+        if (segmentCount == 1) null else SimplePath(segments.dropLast(1))
+
+    internal fun child(segment: Segment) = SimplePath(segments + segment)
 
     internal fun allSubPaths() =
-        (1..segments.size)
+        (1..segmentCount)
             .asSequence()
             .map(segments::take)
             .map(::SimplePath)

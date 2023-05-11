@@ -9,6 +9,7 @@ class SimplePathTest {
     fun `creating invalid Segments should fail`() {
         assertFails { SimplePath.Segment.of("") }
         assertFails { SimplePath.Segment.of(" ") }
+        assertFails { SimplePath.Segment.of("foo/bar") }
         assertFails { SimplePath.Segment.of("\t") }
         assertFails { SimplePath.Segment.of("foo\tbal") }
         assertFails {
@@ -63,6 +64,14 @@ class SimplePathTest {
     @Test
     fun `parent should return direct parent if not in root`() {
         assertEquals(SimplePath.of("/1"), SimplePath.of("/1/2").parent())
+    }
+
+    @Test
+    fun `child should append child at the end of the path`() {
+        val expected = SimplePath.of("/parent/child")
+        val actual = SimplePath.of("/parent").child(SimplePath.Segment.of("child"))
+
+        assertEquals(expected, actual)
     }
 
     private fun segments(vararg segments: String) =

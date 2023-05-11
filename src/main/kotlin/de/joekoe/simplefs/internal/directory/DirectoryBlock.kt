@@ -6,6 +6,7 @@ import de.joekoe.simplefs.internal.SimpleFsWritableChannel
 import de.joekoe.simplefs.internal.byteCount
 import de.joekoe.simplefs.internal.directory.DirectoryEntry.DirectoryPointer
 import de.joekoe.simplefs.internal.directory.DirectoryEntry.FilePointer
+import java.nio.ByteBuffer
 import java.nio.channels.Channels
 import java.nio.channels.FileChannel
 
@@ -32,9 +33,27 @@ internal class DirectoryBlock(
             SimplePath.Segment.SIZE_LIMIT + metadataSize
         }
         private val BLOCK_SIZE = MAX_ENTRIES * ENTRY_SIZE.toLong()
+
+        private val INIT_BUFFER by lazy {
+            ByteBuffer.allocate(BLOCK_SIZE.toInt()).apply {
+                val emptyLine = NEW_LINE.toString().toByteArray(CHARSET)
+                while (position() < capacity()) put(emptyLine)
+            }
+        }
     }
 
     private val entries: MutableMap<SimplePath.Segment, DirectoryEntry> by lazy { loadEntries() }
+
+    init {
+        // reserve space in the underlying file if this block was newly created
+        if (start == fileChannel.size()) {
+            INIT_BUFFER.flip()
+            SimpleFsWritableChannel(fileChannel, start) {}
+                .use { wc ->
+                    while (INIT_BUFFER.hasRemaining()) wc.write(INIT_BUFFER)
+                }
+        }
+    }
 
     fun allEntries() = entries.values.toList()
 

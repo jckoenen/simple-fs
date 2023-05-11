@@ -2,17 +2,11 @@ package de.joekoe.simplefs
 
 public sealed interface SimpleFileSystemNode {
     public val name: String
-    public val absolutePath: SimplePath
+    public val absolutePath: AbsolutePath
 
-    public fun moveTo(directory: DirectoryNode) {
-        TODO()
-    }
+    public fun moveTo(directory: DirectoryNode)
 
-    public fun rename(name: String) {
-        TODO()
-    }
+    public fun rename(name: SimplePath.Segment)
 
-    public fun delete() {
-        TODO()
-    }
+    public fun delete()
 }

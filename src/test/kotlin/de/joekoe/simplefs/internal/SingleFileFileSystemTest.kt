@@ -45,17 +45,21 @@ class SingleFileFileSystemTest {
         allFilesInProject()
             .forEach { path ->
                 val sp = SimplePath.of(path.toString())
-                when {
-                    path.isDirectory() -> fs.createDirectory(sp)
-                    path.isRegularFile() -> {
-                        val target = fs.createFile(sp)
-                        FileChannel.open(path)
-                            .use { fc ->
-                                target.writeChannel().use { fc.copyTo(it) }
-                            }
-                    }
+                try {
+                    when {
+                        path.isDirectory() -> fs.createDirectory(sp)
+                        path.isRegularFile() -> {
+                            val target = fs.createFile(sp)
+                            FileChannel.open(path)
+                                .use { fc ->
+                                    target.writeChannel().use { fc.copyTo(it) }
+                                }
+                        }
 
-                    else -> error("Skipping path $path - neither file nor directory")
+                        else -> error("Skipping path $path - neither file nor directory")
+                    }
+                } catch (ex: Throwable) {
+                    throw IllegalStateException("Couldn't copy $path to filesystem", ex)
                 }
             }
     }
@@ -64,22 +68,26 @@ class SingleFileFileSystemTest {
         allFilesInProject()
             .forEach { path ->
                 val sp = SimplePath.of(path.toString())
-                when {
-                    path.isDirectory() -> assertIs<DirectoryNode>(fs.open(sp))
-                    path.isRegularFile() -> {
-                        val expected = Files.readAllBytes(path)
-                        val copy = fs.open(sp)
-                        assertIs<FileNode>(copy)
-                        val actual = copy.readChannel().consumeBytes()
+                try {
+                    when {
+                        path.isDirectory() -> assertIs<DirectoryNode>(fs.open(sp))
+                        path.isRegularFile() -> {
+                            val expected = Files.readAllBytes(path)
+                            val copy = fs.open(sp)
+                            assertIs<FileNode>(copy)
+                            val actual = copy.readChannel().consumeBytes()
 
-                        assertEquals(expected.size, actual.size)
-                        expected.zip(actual)
-                            .forEach { (expectedByte, actualByte) ->
-                                assertEquals(expectedByte, actualByte)
-                            }
+                            assertEquals(expected.size, actual.size)
+                            expected.zip(actual)
+                                .forEach { (expectedByte, actualByte) ->
+                                    assertEquals(expectedByte, actualByte)
+                                }
+                        }
+
+                        else -> error("Skipping path $path - neither file nor directory")
                     }
-
-                    else -> error("Skipping path $path - neither file nor directory")
+                } catch (ex: Throwable) {
+                    throw IllegalStateException("Comparison failed at $path", ex)
                 }
             }
 }

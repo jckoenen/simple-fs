@@ -16,6 +16,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    testLogging.showStackTraces = true
 }
 
 kotlin {

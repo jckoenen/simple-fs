@@ -19,8 +19,12 @@ import kotlin.test.assertIs
 
 class SingleFileFileSystemTest {
     private fun allFilesInProject() =
-        Files.walk(Path("")).filter { it.toString().isNotBlank() }
+        Files.walk(Path(""))
             .asSequence()
+            .filterNot {
+                val relative = it.toString()
+                relative.isBlank() || relative.startsWith("build/test-results")
+            }
 
     @Test
     fun `copying project folder should preserve content`() = withFileSystem { subject, _ ->

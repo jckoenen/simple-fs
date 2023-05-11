@@ -1,14 +1,13 @@
 package de.joekoe.simplefs
 
+import de.joekoe.simplefs.internal.SingleFileFileSystem
 import de.joekoe.simplefs.internal.directory.DirectoryBlock
 import de.joekoe.simplefs.internal.directory.DirectoryEntry
-import java.nio.channels.FileChannel
 
 public class DirectoryNode internal constructor(
     initialPath: AbsolutePath,
-    private val fileChannel: FileChannel,
-    private val block: DirectoryBlock,
-    private var parent: DirectoryBlock
+    private var parent: DirectoryBlock,
+    private val fileSystem: SingleFileFileSystem
 ) : SimpleFileSystemNode {
 
     override val name: String get() = absolutePath.lastSegment.toString()
@@ -23,46 +22,25 @@ public class DirectoryNode internal constructor(
     public fun createDirectory(name: SimplePath.Segment): DirectoryNode {
         requireNotDeleted()
 
-        val pos = fileChannel.size()
-        // TODO retrieve block from FS
-        val childBlock = DirectoryBlock(fileChannel, pos)
-        block.addOrReplace(DirectoryEntry.DirectoryPointer(name, pos))
-        return DirectoryNode(absolutePath.child(name), fileChannel, childBlock, block)
+        return fileSystem.createDirectory(absolutePath.child(name))
     }
 
     public fun createFile(name: SimplePath.Segment): FileNode {
         requireNotDeleted()
 
-        val pos = fileChannel.size()
-        block.addOrReplace(DirectoryEntry.FilePointer(name, pos, 0))
-        return FileNode(absolutePath.child(name), fileChannel, block)
+        return fileSystem.createFile(absolutePath.child(name))
     }
 
     override fun moveTo(directory: DirectoryNode) {
-        val pointer = requireNotDeleted()
-        val isNotChildOfThis = directory.absolutePath.allSubPaths()
-            .take(absolutePath.segmentCount)
-            .none { it == absolutePath }
-        require(isNotChildOfThis) { "Can't move this directory to a child directory" }
-
-        parent = directory.link(pointer)
+        parent = fileSystem.moveTo(this, directory.absolutePath)
+        absolutePath = directory.absolutePath.child(absolutePath.lastSegment)
     }
 
     override fun rename(name: SimplePath.Segment) {
-        val pointer = requireNotDeleted()
-        val parentPath = requireNotNull(absolutePath.parent()) {
-            "Cannot rename root directory"
-        }
-
-        parent.addOrReplace(pointer.copy(relativeName = name))
-        absolutePath = parentPath.child(name)
+        absolutePath = fileSystem.rename(this, name)
     }
 
     override fun delete() {
-        requireNotDeleted()
-
-        parent.delete(absolutePath.lastSegment)
+        fileSystem.delete(this)
     }
-
-    internal fun link(entry: DirectoryEntry): DirectoryBlock = parent.apply { addOrReplace(entry) }
 }

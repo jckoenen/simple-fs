@@ -9,6 +9,7 @@ import de.joekoe.simplefs.SimplePath
 import de.joekoe.simplefs.internal.directory.DirectoryBlock
 import de.joekoe.simplefs.internal.directory.DirectoryEntry.DirectoryPointer
 import de.joekoe.simplefs.internal.directory.DirectoryEntry.FilePointer
+import de.joekoe.simplefs.internal.directory.withNewName
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 
@@ -34,7 +35,7 @@ internal class SingleFileFileSystem(
         parent.addOrReplace(DirectoryPointer(path.lastSegment, pos))
         blocks[path] = block
 
-        return DirectoryNode(path, channel, block, parent)
+        return DirectoryNode(path, parent, this)
     }
 
     override fun createFile(path: AbsolutePath): FileNode {
@@ -48,7 +49,7 @@ internal class SingleFileFileSystem(
         val pos = channel.size()
         parent.addOrReplace(FilePointer(path.lastSegment, pos, 0))
 
-        return FileNode(path, channel, parent)
+        return FileNode(path, channel, parent, this)
     }
 
     override fun open(path: AbsolutePath): SimpleFileSystemNode? {
@@ -58,16 +59,62 @@ internal class SingleFileFileSystem(
             is FilePointer -> FileNode(
                 initialPath = path,
                 fileChannel = channel,
-                parent = parent
+                parent = parent,
+                fileSystem = this
             )
 
             is DirectoryPointer -> DirectoryNode(
                 initialPath = path,
-                fileChannel = channel,
-                block = checkNotNull(blockAt(path, parent)),
-                parent = parent
+                parent = parent,
+                fileSystem = this
             )
         }
+    }
+
+    internal fun moveTo(node: SimpleFileSystemNode, path: AbsolutePath): DirectoryBlock {
+        val notRecursive = path.allSubPaths()
+            .none { it == node.absolutePath }
+        require(notRecursive) { "Can't move this node to a child directory" }
+
+        val oldParent = checkNotNull(parentBlockOf(node.absolutePath)) {
+            "Source directory doesn't exist"
+        }
+        val newParent = checkNotNull(parentBlockOf(path)?.let { blockAt(path, it) }) {
+            "Target directory doesn't exist"
+        }
+        val oldPointer = checkNotNull(oldParent.get(node.absolutePath.lastSegment)) {
+            "Node no longer linked to parent"
+        }
+
+        newParent.addOrReplace(oldPointer)
+        oldParent.delete(node.absolutePath.lastSegment)
+        blocks.remove(node.absolutePath)?.let {
+            blocks[path.child(node.absolutePath.lastSegment)] = it
+        }
+
+        return newParent
+    }
+
+    internal fun rename(node: SimpleFileSystemNode, name: SimplePath.Segment): AbsolutePath {
+        val parent = requireNotNull(parentBlockOf(node.absolutePath)) {
+            "Parent directory doesn't exist"
+        }
+        val oldName = node.absolutePath.lastSegment
+        val newPath = requireNotNull(node.absolutePath.parent()?.child(name))
+        val oldPointer = checkNotNull(parent.get(oldName)) { "Node no longer linked to parent" }
+
+        parent.addOrReplace(oldPointer.withNewName(name))
+        blocks.remove(node.absolutePath)?.let { blocks[newPath] = it }
+
+        return newPath
+    }
+
+    internal fun delete(node: SimpleFileSystemNode) {
+        val parent = requireNotNull(parentBlockOf(node.absolutePath)) {
+            "Parent directory doesn't exist"
+        }
+        parent.delete(node.absolutePath.lastSegment)
+        blocks.remove(node.absolutePath)
     }
 
     private fun parentBlockOf(path: AbsolutePath): DirectoryBlock? =

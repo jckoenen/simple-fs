@@ -17,3 +17,8 @@ internal sealed interface DirectoryEntry {
         override val offset: Long
     ) : DirectoryEntry
 }
+
+internal fun DirectoryEntry.withNewName(name: SimplePath.Segment) = when (this) {
+    is DirectoryEntry.DirectoryPointer -> copy(relativeName = name)
+    is DirectoryEntry.FilePointer -> copy(relativeName = name)
+}

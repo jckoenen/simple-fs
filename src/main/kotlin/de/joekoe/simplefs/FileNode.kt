@@ -2,6 +2,7 @@ package de.joekoe.simplefs
 
 import de.joekoe.simplefs.internal.SimpleFsReadableChannel
 import de.joekoe.simplefs.internal.SimpleFsWritableChannel
+import de.joekoe.simplefs.internal.SingleFileFileSystem
 import de.joekoe.simplefs.internal.directory.DirectoryBlock
 import de.joekoe.simplefs.internal.directory.DirectoryEntry
 import java.nio.ByteBuffer
@@ -12,7 +13,8 @@ import java.nio.channels.WritableByteChannel
 public class FileNode internal constructor(
     initialPath: AbsolutePath,
     private val fileChannel: FileChannel,
-    private var parent: DirectoryBlock
+    private var parent: DirectoryBlock,
+    private val fileSystem: SingleFileFileSystem
 ) : SimpleFileSystemNode {
 
     override val name: String get() = absolutePath.lastSegment.toString()
@@ -52,25 +54,15 @@ public class FileNode internal constructor(
     }
 
     override fun moveTo(directory: DirectoryNode) {
-        val pointer = requireNotDeleted()
-
-        parent = directory.link(pointer)
+        parent = fileSystem.moveTo(this, directory.absolutePath)
+        absolutePath = directory.absolutePath.child(absolutePath.lastSegment)
     }
 
     override fun rename(name: SimplePath.Segment) {
-        val pointer = requireNotDeleted()
-
-        val parentPath = checkNotNull(absolutePath.parent()) {
-            "Unexpected FileNode as root."
-        }
-
-        parent.addOrReplace(pointer.copy(relativeName = name))
-        absolutePath = parentPath.child(name)
+        absolutePath = fileSystem.rename(this, name)
     }
 
     override fun delete() {
-        requireNotDeleted()
-
-        parent.delete(absolutePath.lastSegment)
+        fileSystem.delete(this)
     }
 }

@@ -128,12 +128,13 @@ internal class SingleFileFileSystem(
     }
 
     internal fun delete(node: SimpleFileSystemNode) {
-        val parent = requireNotNull(parentBlockOf(node.absolutePath)) {
-            "Parent directory doesn't exist"
+        if (node is DirectoryNode) {
+            node.children().forEach(SimpleFileSystemNode::delete)
         }
+        requireNotNull(parentBlockOf(node.absolutePath)) { "Parent directory doesn't exist" }
+            .delete(node.absolutePath.lastSegment)
         nodeCache(node).remove(node.absolutePath)
         blocks.remove(node.absolutePath)
-        parent.delete(node.absolutePath.lastSegment)
     }
 
     private fun parentBlockOf(path: AbsolutePath): DirectoryBlock? =
@@ -154,7 +155,7 @@ internal class SingleFileFileSystem(
     private fun <T : SimpleFileSystemNode> nodeCache(node: T): WeakValueMap<AbsolutePath, T> = when (node) {
         is DirectoryNode -> directories as WeakValueMap<AbsolutePath, T>
         is FileNode -> files as WeakValueMap<AbsolutePath, T>
-        else -> error("No nodecache registered for $node")
+        else -> error("No node cache registered for $node")
     }
 
     override fun compact() {
@@ -166,10 +167,14 @@ internal class SingleFileFileSystem(
             .drop(1) // no need to copy the root
             .forEach { node ->
                 when (node) {
-                    is DirectoryNode -> other.createDirectory(node.absolutePath)
+                    is DirectoryNode -> {
+                        if (node.children().any()) {
+                            other.createDirectory(node.absolutePath)
+                        }
+                    }
+
                     is FileNode -> {
-                        other.createFile(node.absolutePath)
-                            .writeChannel()
+                        other.createFile(node.absolutePath).writeChannel()
                             .use { wc ->
                                 node.readChannel().use { it.copyTo(wc) }
                             }
@@ -178,18 +183,17 @@ internal class SingleFileFileSystem(
             }
     }
 
-    internal fun breadthFirstTraversal(start: SimpleFileSystemNode = rootNode): Sequence<SimpleFileSystemNode> =
-        sequence {
-            val q = ArrayDeque<SimpleFileSystemNode>()
-            q.add(start)
-            while (q.isNotEmpty()) {
-                val node = q.removeFirst()
-                if (node is DirectoryNode) {
-                    q.addAll(node.children().toList())
-                }
-                yield(node)
+    internal fun breadthFirstTraversal(): Sequence<SimpleFileSystemNode> = sequence {
+        val q = ArrayDeque<SimpleFileSystemNode>()
+        q.add(rootNode)
+        while (q.isNotEmpty()) {
+            val node = q.removeFirst()
+            if (node is DirectoryNode) {
+                q.addAll(node.children().toList())
             }
+            yield(node)
         }
+    }
 
     override fun close() = channel.close()
 }

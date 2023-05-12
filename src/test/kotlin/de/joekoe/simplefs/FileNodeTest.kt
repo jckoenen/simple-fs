@@ -89,7 +89,7 @@ class FileNodeTest {
         val subject = old.createFile(SimplePath.Segment.of("test"))
         subject.moveTo(new)
 
-        assertTrue(old.children().toList().isEmpty())
+        assertTrue(old.children().none())
         assertEquals(subject, new.children().single())
     }
 

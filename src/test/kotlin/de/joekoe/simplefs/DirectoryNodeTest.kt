@@ -55,11 +55,11 @@ class DirectoryNodeTest {
 
         child.writeChannel().use { it.write(ByteBuffer.wrap("Hello, World".toByteArray())) }
         val contentBefore = child.readChannel().consumeText()
-        val childrenBefore = subject.children().toList().map { it.name }
+        val childrenBefore = subject.children().map { it.name }.toList()
 
         subject.rename(Segment.of("another name"))
 
-        val childrenAfter = subject.children().toList().map { it.name }
+        val childrenAfter = subject.children().map { it.name }.toList()
         val contentAfter = child.readChannel().consumeText()
 
         assertEquals(childrenBefore, childrenAfter)
@@ -110,7 +110,7 @@ class DirectoryNodeTest {
 
         val afterDeletion = fs.createDirectory(path)
 
-        assertTrue(afterDeletion.children().toList().isEmpty())
+        assertTrue(afterDeletion.children().none())
         assertNull(afterDeletion.open(filePath))
         assertNull(afterDeletion.open(dirPath))
     }

@@ -13,21 +13,23 @@ import org.junit.jupiter.api.condition.OS
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import kotlin.io.path.Path
+import kotlin.io.path.fileSize
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.streams.asSequence
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @DisabledOnOs(OS.WINDOWS) // TODO
 class SingleFileFileSystemTest {
 
     private val ignoredFolders = listOf(
-        "build/test-results", // fails on any stdout/sterr output. gradle writes them to a file
-        ".gradle", // fails on windows due to file lock
-        "build/classes/kotlin/test", // inline functions create class files, the test names won't fit into a segment
-        "build/kotlin" // cache files on windows can exceed the node limit per directory
+        "build", // gradle touches multiple files in this directory while testing, breaks comparison
+        ".gradle" // fails on windows due to file lock
     )
 
     private fun allFilesInProject() =
@@ -59,50 +61,119 @@ class SingleFileFileSystemTest {
             source.compactTo(target)
 
             val sourceEntries = source.breadthFirstTraversal()
+                .filter { it !is DirectoryNode || it.children().any() }
                 .map { it.absolutePath.toString() }
                 .toSortedSet()
             val targetEntries = target.breadthFirstTraversal()
+                .filter { it !is DirectoryNode || it.children().any() }
                 .map { it.absolutePath.toString() }
                 .toSortedSet()
-            assertEquals(sourceEntries, targetEntries)
 
-            assertSequenceEquals(
-                source.breadthFirstTraversal(),
-                target.breadthFirstTraversal()
-            ) { fromSource, fromTarget ->
-                assertEquals(fromSource.absolutePath, fromTarget.absolutePath)
-                assertEquals(fromSource.name, fromTarget.name)
-                when (fromSource) {
-                    is DirectoryNode -> assertIs<DirectoryNode>(fromTarget)
+            assertEquals(emptySet(), sourceEntries - targetEntries)
 
-                    is FileNode -> {
-                        assertIs<FileNode>(fromTarget)
-                        assertContentEquals(
-                            fromSource.readChannel().consumeBytes(),
-                            fromTarget.readChannel().consumeBytes()
-                        )
+            source.breadthFirstTraversal()
+                .drop(1)
+                .forEach { sourceNode ->
+                    val targetNode = target.open(sourceNode.absolutePath)
+
+                    when (sourceNode) {
+                        is DirectoryNode -> {
+                            if (sourceNode.children().any()) {
+                                assertIs<DirectoryNode>(targetNode)
+                                assertEquals(sourceNode.name, targetNode.name)
+                            } else {
+                                assertNull(targetNode)
+                            }
+                        }
+
+                        is FileNode -> {
+                            assertIs<FileNode>(targetNode)
+                            assertEquals(sourceNode.name, targetNode.name)
+                            assertContentEquals(
+                                sourceNode.readChannel().consumeBytes(),
+                                targetNode.readChannel().consumeBytes()
+                            )
+                        }
                     }
                 }
-            }
         }
     }
 
-    private inline fun <T> assertSequenceEquals(
-        expected: Sequence<T>,
-        actual: Sequence<T>,
-        assert: (e: T, a: T) -> Unit
-    ) {
-        val aList = actual.toList()
-        val eList = expected.toList()
+    @Test
+    fun `Verify store - delete - compact - store - read cycle`() = withFileSystem { original, originalPath ->
+        copyProjectToFileSystem(original)
 
-        assertEquals(eList.size, aList.size)
-        eList.zip(aList, assert)
+        val deletionChance = 70
+        val deletedPaths = original.breadthFirstTraversal()
+            .filterIsInstance<FileNode>()
+            .filter { (it.hashCode() % 100) < deletionChance }
+            .map {
+                val path = it.absolutePath
+                it.delete()
+                path
+            }
+            .toHashSet()
+
+        withFileSystem { compacted, compactedPath ->
+            original.compactTo(compacted)
+            assertTrue(originalPath.fileSize() > compactedPath.fileSize())
+
+            val prefix = SimplePath.of("second-write")
+            compacted.createDirectory(prefix)
+
+            copyProjectToFileSystem(compacted, prefix)
+
+            compacted.close()
+            original.close()
+
+            val originalReopened = SimpleFileSystem(originalPath)
+            val compactedReopened = SimpleFileSystem(compactedPath)
+
+            allFilesInProject()
+                .map { SimplePath.of(it.toString()) }
+                .forEach { pathFromFirstWrite ->
+                    val pathFromSecondWrite = prefix + pathFromFirstWrite
+
+                    when {
+                        deletedPaths.contains(pathFromFirstWrite) -> {
+                            assertNull(originalReopened.open(pathFromFirstWrite))
+                            assertNull(compactedReopened.open(pathFromFirstWrite))
+                            assertNotNull(compactedReopened.open(pathFromSecondWrite))
+                        }
+
+                        originalReopened.open(pathFromFirstWrite) is DirectoryNode -> {
+                            assertIs<DirectoryNode>(compactedReopened.open(pathFromSecondWrite))
+
+                            val hasChildren = assertIs<DirectoryNode>(original.open(pathFromFirstWrite))
+                                .children()
+                                .any()
+                            if (hasChildren) {
+                                assertIs<DirectoryNode>(compactedReopened.open(pathFromFirstWrite))
+                            } else {
+                                assertNull(compactedReopened.open(pathFromFirstWrite))
+                            }
+                        }
+
+                        originalReopened.open(pathFromFirstWrite) is FileNode -> {
+                            val inFirstWrite = assertIs<FileNode>(compactedReopened.open(pathFromFirstWrite))
+                            val inSecondWrite = assertIs<FileNode>(compactedReopened.open(pathFromSecondWrite))
+
+                            val expectedBytes = assertIs<FileNode>(originalReopened.open(pathFromFirstWrite))
+                                .readChannel()
+                                .consumeBytes()
+
+                            assertContentEquals(expectedBytes, inFirstWrite.readChannel().consumeBytes())
+                            assertContentEquals(expectedBytes, inSecondWrite.readChannel().consumeBytes())
+                        }
+                    }
+                }
+        }
     }
 
-    private fun copyProjectToFileSystem(fs: SimpleFileSystem) {
+    private fun copyProjectToFileSystem(fs: SimpleFileSystem, pathPrefix: SimplePath = SimplePath.ROOT) {
         allFilesInProject()
             .forEach { path ->
-                val sp = SimplePath.of(path.toString())
+                val sp = pathPrefix + SimplePath.of(path.toString())
                 try {
                     when {
                         path.isDirectory() -> fs.createDirectory(sp)
@@ -131,8 +202,7 @@ class SingleFileFileSystemTest {
                         path.isDirectory() -> assertIs<DirectoryNode>(fs.open(sp))
                         path.isRegularFile() -> {
                             val expected = Files.readAllBytes(path)
-                            val copy = fs.open(sp)
-                            assertIs<FileNode>(copy)
+                            val copy = assertIs<FileNode>(fs.open(sp))
                             val actual = copy.readChannel().consumeBytes()
 
                             assertEquals(expected.size, actual.size)

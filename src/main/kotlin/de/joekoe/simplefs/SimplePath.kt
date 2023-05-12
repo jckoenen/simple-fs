@@ -28,13 +28,15 @@ public value class SimplePath private constructor(
 
     private val segmentCount get() = segments.size
 
-    internal fun parent(): SimplePath? = when (segmentCount) {
+    public operator fun plus(that: SimplePath): SimplePath = SimplePath(this.segments + that.segments)
+
+    public fun parent(): SimplePath? = when (segmentCount) {
         0 -> null
         1 -> ROOT
         else -> SimplePath(segments.dropLast(1))
     }
 
-    internal fun child(segment: Segment) = SimplePath(segments + segment)
+    public fun child(segment: Segment): SimplePath = SimplePath(segments + segment)
 
     internal fun allSubPaths() =
         (1..segmentCount)

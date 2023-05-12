@@ -41,7 +41,6 @@ public class DirectoryNode internal constructor(
     }
 
     override fun delete() {
-        children().forEach(fileSystem::delete)
         fileSystem.delete(this)
     }
 

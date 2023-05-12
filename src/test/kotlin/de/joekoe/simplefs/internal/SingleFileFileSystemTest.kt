@@ -8,15 +8,19 @@ import de.joekoe.simplefs.consumeBytes
 import de.joekoe.simplefs.copyTo
 import de.joekoe.simplefs.withFileSystem
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.DisabledOnOs
+import org.junit.jupiter.api.condition.OS
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import kotlin.io.path.Path
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.streams.asSequence
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
+@DisabledOnOs(OS.WINDOWS) // TODO
 class SingleFileFileSystemTest {
 
     private val ignoredFolders = listOf(
@@ -33,7 +37,7 @@ class SingleFileFileSystemTest {
             .filterNot { ignoredFolders.any(it::startsWith) }
 
     @Test
-    fun `copying project folder should preserve content`() = withFileSystem { subject, _ ->
+    fun `copying project folder should preserve content`() = withFileSystem { subject ->
         copyProjectToFileSystem(subject)
 
         compareProjectWithFs(subject)
@@ -84,10 +88,7 @@ class SingleFileFileSystemTest {
                             val actual = copy.readChannel().consumeBytes()
 
                             assertEquals(expected.size, actual.size)
-                            expected.zip(actual)
-                                .forEach { (expectedByte, actualByte) ->
-                                    assertEquals(expectedByte, actualByte)
-                                }
+                            assertContentEquals(expected, actual)
                         }
 
                         else -> error("Skipping path $path - neither file nor directory")

@@ -19,6 +19,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -94,6 +95,16 @@ class SingleFileFileSystemTest {
                     }
                 }
         }
+    }
+
+    @Test
+    fun `compacting in place should not fail`() = withFileSystem { fs ->
+        copyProjectToFileSystem(fs)
+
+        val new = fs.compact()
+        assertNotSame(fs, new)
+
+        compareProjectWithFs(new)
     }
 
     @Test
@@ -196,7 +207,16 @@ class SingleFileFileSystemTest {
                 val sp = SimplePath.of(path.toString())
                 try {
                     when {
-                        path.isDirectory() -> assertIs<DirectoryNode>(fs.open(sp))
+                        path.isDirectory() -> {
+                            val hasChildren = Files.newDirectoryStream(path)
+                                .any()
+                            if (hasChildren) {
+                                assertIs<DirectoryNode>(fs.open(sp))
+                            } else {
+                                // null is okey after compaction
+                                fs.open(sp)?.let { assertIs<DirectoryNode>(it) }
+                            }
+                        }
                         path.isRegularFile() -> {
                             val expected = Files.readAllBytes(path)
                             val copy = assertIs<FileNode>(fs.open(sp))

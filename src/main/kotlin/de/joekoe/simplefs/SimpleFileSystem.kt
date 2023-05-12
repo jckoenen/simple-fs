@@ -12,10 +12,10 @@ public interface SimpleFileSystem : Closeable {
     public fun createFile(path: AbsolutePath): FileNode
     public fun open(path: AbsolutePath): SimpleFileSystemNode?
 
-    public fun compact()
+    public fun compact(): SimpleFileSystem
 
     public companion object {
         public operator fun invoke(path: Path): SimpleFileSystem =
-            SingleFileFileSystem(RandomAccessFile(path.toFile(), "rw"))
+            SingleFileFileSystem(RandomAccessFile(path.toFile(), "rw"), path)
     }
 }

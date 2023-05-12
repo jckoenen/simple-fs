@@ -20,10 +20,10 @@ internal inline fun withTempFile(test: (raf: RandomAccessFile, path: Path) -> Un
 }
 
 internal inline fun withFileSystem(test: (fs: SingleFileFileSystem) -> Unit) =
-    withTempFile { raf -> SingleFileFileSystem(raf).use(test) }
+    withTempFile { raf, path -> SingleFileFileSystem(raf, path).use(test) }
 
 internal inline fun withFileSystem(test: (fs: SingleFileFileSystem, path: Path) -> Unit) =
-    withTempFile { raf, path -> test(SingleFileFileSystem(raf), path) }
+    withTempFile { raf, path -> test(SingleFileFileSystem(raf, path), path) }
 
 internal inline fun withTempFile(test: (raf: RandomAccessFile) -> Unit) = withTempFile { raf, _ -> test(raf) }
 

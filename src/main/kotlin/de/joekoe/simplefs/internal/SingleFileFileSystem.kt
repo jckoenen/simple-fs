@@ -12,9 +12,13 @@ import de.joekoe.simplefs.internal.directory.DirectoryEntry.FilePointer
 import de.joekoe.simplefs.internal.directory.withNewName
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 
 internal class SingleFileFileSystem(
-    container: RandomAccessFile
+    container: RandomAccessFile,
+    private val path: Path
 ) : SimpleFileSystem {
 
     private val channel: FileChannel = container.channel
@@ -158,8 +162,14 @@ internal class SingleFileFileSystem(
         else -> error("No node cache registered for $node")
     }
 
-    override fun compact() {
-        TODO("Not yet implemented")
+    override fun compact(): SimpleFileSystem {
+        val tmpPath = path.resolveSibling("tmp+${hashCode()}.fs")
+        (SimpleFileSystem(tmpPath) as SingleFileFileSystem)
+            .use { this.compactTo(it) }
+        close()
+        Files.move(tmpPath, path, StandardCopyOption.REPLACE_EXISTING)
+
+        return SimpleFileSystem(path)
     }
 
     internal fun compactTo(other: SingleFileFileSystem) {

@@ -66,11 +66,13 @@ internal class DirectoryBlock(
         }
     }
 
-    fun delete(relativeName: SimplePath.Segment) {
-        if (entries.remove(relativeName) != null) {
+    fun unlink(relativeName: SimplePath.Segment, commit: Boolean = true) {
+        if (entries.remove(relativeName) != null && commit) {
             saveEntries()
         }
     }
+
+    fun commit() = saveEntries()
 
     fun get(relativeName: SimplePath.Segment) = entries[relativeName]
 

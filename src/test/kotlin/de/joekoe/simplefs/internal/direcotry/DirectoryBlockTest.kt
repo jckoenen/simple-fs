@@ -37,7 +37,7 @@ class DirectoryBlockTest {
     fun `should delete file entry correctly`() = withTempFile { raf ->
         val subject = DirectoryBlock(raf.channel, 0, SimplePath.ROOT)
         subject.addOrReplace(fileA)
-        subject.delete(fileA.relativeName)
+        subject.unlink(fileA.relativeName)
 
         assertTrue(subject.allEntries().isEmpty())
     }
@@ -54,7 +54,7 @@ class DirectoryBlockTest {
     fun `should delete directory entry correctly`() = withTempFile { raf ->
         val subject = DirectoryBlock(raf.channel, 0, SimplePath.ROOT)
         subject.addOrReplace(dirA)
-        subject.delete(dirA.relativeName)
+        subject.unlink(dirA.relativeName)
 
         assertTrue(subject.allEntries().isEmpty())
     }
@@ -78,7 +78,7 @@ class DirectoryBlockTest {
             .use {
                 val b = DirectoryBlock(it, 0, SimplePath.ROOT)
                 val entries = b.allEntries()
-                b.delete(dirB.relativeName)
+                b.unlink(dirB.relativeName)
                 entries
             }
 

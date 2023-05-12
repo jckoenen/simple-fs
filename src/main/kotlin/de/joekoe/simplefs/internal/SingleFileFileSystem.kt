@@ -107,7 +107,7 @@ internal class SingleFileFileSystem(
         }
 
         newParent.addOrReplace(oldPointer)
-        oldParent.delete(node.absolutePath.lastSegment)
+        oldParent.unlink(node.absolutePath.lastSegment)
         val newPath = path.child(node.absolutePath.lastSegment)
 
         blocks.reKey(node.absolutePath, newPath)
@@ -132,13 +132,20 @@ internal class SingleFileFileSystem(
     }
 
     internal fun delete(node: SimpleFileSystemNode) {
-        if (node is DirectoryNode) {
-            node.children().forEach(SimpleFileSystemNode::delete)
-        }
-        requireNotNull(parentBlockOf(node.absolutePath)) { "Parent directory doesn't exist" }
-            .delete(node.absolutePath.lastSegment)
-        nodeCache(node).remove(node.absolutePath)
-        blocks.remove(node.absolutePath)
+        breadthFirstTraversal(node)
+            // move children before their parents
+            .sortedByDescending { it.absolutePath.segments.size }
+            .map { toDelete ->
+                nodeCache(toDelete).remove(toDelete.absolutePath)
+                when (toDelete) {
+                    is DirectoryNode -> blocks.remove(toDelete.absolutePath)
+                    is FileNode -> toDelete.close()
+                }
+                requireNotNull(parentBlockOf(toDelete.absolutePath)) { "Parent directory doesn't exist" }
+                    .apply { unlink(toDelete.absolutePath.lastSegment, commit = false) }
+            }
+            .distinctBy(DirectoryBlock::absolutePath)
+            .forEach(DirectoryBlock::commit)
     }
 
     private fun parentBlockOf(path: AbsolutePath): DirectoryBlock? =
@@ -193,17 +200,18 @@ internal class SingleFileFileSystem(
             }
     }
 
-    internal fun breadthFirstTraversal(): Sequence<SimpleFileSystemNode> = sequence {
-        val q = ArrayDeque<SimpleFileSystemNode>()
-        q.add(rootNode)
-        while (q.isNotEmpty()) {
-            val node = q.removeFirst()
-            if (node is DirectoryNode) {
-                q.addAll(node.children().toList())
+    internal fun breadthFirstTraversal(from: SimpleFileSystemNode = rootNode): Sequence<SimpleFileSystemNode> =
+        sequence {
+            val q = ArrayDeque<SimpleFileSystemNode>()
+            q.add(from)
+            while (q.isNotEmpty()) {
+                val node = q.removeFirst()
+                if (node is DirectoryNode) {
+                    q.addAll(node.children().toList())
+                }
+                yield(node)
             }
-            yield(node)
         }
-    }
 
     override fun close() = channel.close()
 }

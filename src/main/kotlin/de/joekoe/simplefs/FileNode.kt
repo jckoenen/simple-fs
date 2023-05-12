@@ -19,10 +19,10 @@ public class FileNode internal constructor(
 
     override val name: String get() = segment.toString()
     override val absolutePath: AbsolutePath get() = parent.absolutePath.child(segment)
-    private var deleted = false
+    private var closed = false
 
     private fun requireNotDeleted(): DirectoryEntry.FilePointer {
-        check(!deleted) { "File has already been deleted" }
+        check(!closed) { "File has already been deleted" }
 
         return checkNotNull(parent.get(absolutePath.lastSegment) as? DirectoryEntry.FilePointer) {
             "File has already been deleted"
@@ -62,7 +62,10 @@ public class FileNode internal constructor(
 
     override fun delete() {
         fileSystem.delete(this)
-        deleted = true
+    }
+
+    internal fun close() {
+        closed = true
     }
 
     override fun equals(other: Any?): Boolean {
@@ -84,8 +87,8 @@ public class FileNode internal constructor(
     override fun toString(): String = buildString {
         append("FileNode(")
         append("absolutePath="); append(absolutePath)
-        append(", deleted="); append(deleted)
-        if (!deleted) {
+        append(", deleted="); append(closed)
+        if (!closed) {
             val pointer = requireNotDeleted()
             append(", offset=", pointer.offset)
             append(", size=", pointer.size)

@@ -14,6 +14,14 @@ public value class SimplePath private constructor(
         public companion object {
             internal const val SIZE_LIMIT = 128
 
+            /**
+             * Creates a new [Segment].
+             *
+             * Segments must not exceed the SIZE_LIMIT, must not be blank, and must not contain '/'
+             * or the tab character.
+             *
+             * @throws IllegalArgumentException if any of the preconditions are violated.
+             */
             public fun of(s: String): Segment {
                 check(s.isNotBlank()) { "Path segment must not be blank" }
                 check('\t' !in s) { "Illegal tab character in segment \"$s\"" }
@@ -24,18 +32,22 @@ public value class SimplePath private constructor(
         }
     }
 
+    /** Returns the last segment of this path, the filename. */
     public val lastSegment: Segment get() = segments.last()
 
     private val segmentCount get() = segments.size
 
+    /** Appends all [segments] of [that] to this path, forming a child path. */
     public operator fun plus(that: SimplePath): SimplePath = SimplePath(this.segments + that.segments)
 
+    /** Returns the immediate parent of this path, or null if this is [ROOT] */
     public fun parent(): SimplePath? = when (segmentCount) {
         0 -> null
         1 -> ROOT
         else -> SimplePath(segments.dropLast(1))
     }
 
+    /** Appends the [segment] to this path, forming a child path. */
     public fun child(segment: Segment): SimplePath = SimplePath(segments + segment)
 
     internal fun allSubPaths() =
@@ -50,8 +62,17 @@ public value class SimplePath private constructor(
     public companion object {
         public const val DELIMITER: Char = '/'
 
+        /** Denotes the root path of the [SimpleFileSystem]. */
         public val ROOT: SimplePath = SimplePath(emptyList())
 
+        /**
+         * Creates a new path from this [path].
+         *
+         * Each [Segment] is separated by the [DELIMITER], and leading [DELIMITER] are ignored.
+         *
+         * @throws IllegalArgumentException if a segment is invalid
+         * @see Segment.of
+         */
         public fun of(path: String): SimplePath =
             path.split(DELIMITER)
                 .dropWhile(String::isBlank) // ignore leading delimiters

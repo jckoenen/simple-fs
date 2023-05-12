@@ -117,11 +117,11 @@ internal class SingleFileFileSystem(
     }
 
     internal fun rename(node: SimpleFileSystemNode, name: SimplePath.Segment): AbsolutePath {
-        val parent = requireNotNull(parentBlockOf(node.absolutePath)) {
+        val parent = checkNotNull(parentBlockOf(node.absolutePath)) {
             "Parent directory doesn't exist"
         }
         val oldName = node.absolutePath.lastSegment
-        val newPath = requireNotNull(node.absolutePath.parent()?.child(name))
+        val newPath = checkNotNull(node.absolutePath.parent()?.child(name))
         val oldPointer = checkNotNull(parent.get(oldName)) { "Node no longer linked to parent" }
 
         parent.addOrReplace(oldPointer.withNewName(name))

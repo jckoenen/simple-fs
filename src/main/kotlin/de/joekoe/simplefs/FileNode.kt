@@ -29,6 +29,11 @@ public class FileNode internal constructor(
         }
     }
 
+    /**
+     * Opens a new [WritableByteChannel] to overwrite data contained in this node.
+     *
+     * The channel MUST be closed after use.
+     */
     public fun writeChannel(): WritableByteChannel {
         val pointer = requireNotDeleted()
         val pos = fileChannel.size()
@@ -37,12 +42,22 @@ public class FileNode internal constructor(
         }
     }
 
+    /**
+     * Opens a new [WritableByteChannel] to append data to this node.
+     *
+     * The channel MUST be closed after use.
+     */
     public fun appendChannel(): WritableByteChannel {
         val wc = writeChannel()
         readChannel().use { it.copyTo(wc) }
         return wc
     }
 
+    /**
+     * Opens a new [ReadableByteChannel] to retrieve data contained in this node.
+     *
+     * The channel MUST be closed after use.
+     */
     public fun readChannel(): ReadableByteChannel {
         val pointer = requireNotDeleted()
 

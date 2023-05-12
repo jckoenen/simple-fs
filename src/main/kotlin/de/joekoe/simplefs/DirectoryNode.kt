@@ -13,12 +13,23 @@ public class DirectoryNode internal constructor(
 
     override val absolutePath: AbsolutePath get() = block.absolutePath
 
+    /**
+     * Creates a new [DirectoryNode] as immediate child of this node.
+     *
+     * @see SimpleFileSystem.createDirectory
+     */
     public fun createDirectory(name: SimplePath.Segment): DirectoryNode =
         fileSystem.createDirectory(absolutePath.child(name))
 
+    /**
+     * Creates a new [FileNode] as immediate child of this node.
+     *
+     * @see SimpleFileSystem.createFile
+     */
     public fun createFile(name: SimplePath.Segment): FileNode =
         fileSystem.createFile(absolutePath.child(name))
 
+    /** Lists all immediate children of this node.  */
     public fun children(): Sequence<SimpleFileSystemNode> =
         block
             .allEntries()
@@ -28,6 +39,11 @@ public class DirectoryNode internal constructor(
                 fileSystem.open(path)
             }
 
+    /**
+     * Retrieves the immediate child reference by [pathSegment], or null if there is none.
+     *
+     * @see SimpleFileSystem.open
+     */
     public fun open(pathSegment: SimplePath.Segment): SimpleFileSystemNode? =
         fileSystem.open(absolutePath.child(pathSegment))
 

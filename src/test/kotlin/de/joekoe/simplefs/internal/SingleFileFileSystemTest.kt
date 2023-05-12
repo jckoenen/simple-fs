@@ -8,8 +8,6 @@ import de.joekoe.simplefs.consumeBytes
 import de.joekoe.simplefs.copyTo
 import de.joekoe.simplefs.withFileSystem
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.condition.DisabledOnOs
-import org.junit.jupiter.api.condition.OS
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import kotlin.io.path.Path
@@ -24,7 +22,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-@DisabledOnOs(OS.WINDOWS) // TODO
 class SingleFileFileSystemTest {
 
     private val ignoredFolders = listOf(

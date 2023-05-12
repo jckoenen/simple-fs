@@ -9,6 +9,7 @@ import de.joekoe.simplefs.copyTo
 import de.joekoe.simplefs.withFileSystem
 import org.junit.jupiter.api.Test
 import java.nio.channels.FileChannel
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import kotlin.io.path.Path
 import kotlin.io.path.fileSize
@@ -29,6 +30,8 @@ class SingleFileFileSystemTest {
         "build", // gradle touches multiple files in this directory while testing, breaks comparison
         ".gradle" // fails on windows due to file lock
     )
+
+    private val systemFileSeparator = FileSystems.getDefault().separator
 
     private fun allFilesInProject() =
         Files.walk(Path(""))
@@ -138,7 +141,7 @@ class SingleFileFileSystemTest {
             val compactedReopened = SimpleFileSystem(compactedPath)
 
             allFilesInProject()
-                .map { SimplePath.of(it.toString()) }
+                .map { it.asSimplePath() }
                 .forEach { pathFromFirstWrite ->
                     val pathFromSecondWrite = prefix + pathFromFirstWrite
 
@@ -181,7 +184,7 @@ class SingleFileFileSystemTest {
     private fun copyProjectToFileSystem(fs: SimpleFileSystem, pathPrefix: SimplePath = SimplePath.ROOT) {
         allFilesInProject()
             .forEach { path ->
-                val sp = pathPrefix + SimplePath.of(path.toString())
+                val sp = pathPrefix + path.asSimplePath()
                 try {
                     when {
                         path.isDirectory() -> fs.createDirectory(sp)
@@ -204,7 +207,7 @@ class SingleFileFileSystemTest {
     private fun compareProjectWithFs(fs: SimpleFileSystem) =
         allFilesInProject()
             .forEach { path ->
-                val sp = SimplePath.of(path.toString())
+                val sp = path.asSimplePath()
                 try {
                     when {
                         path.isDirectory() -> {
@@ -232,4 +235,7 @@ class SingleFileFileSystemTest {
                     throw IllegalStateException("Comparison failed at $path", ex)
                 }
             }
+
+    private fun java.nio.file.Path.asSimplePath() =
+        SimplePath.of(toString().replace(systemFileSeparator, "/"))
 }

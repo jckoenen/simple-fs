@@ -3,9 +3,9 @@ package de.joekoe.simplefs
 import de.joekoe.simplefs.internal.SimpleFsReadableChannel
 import de.joekoe.simplefs.internal.SimpleFsWritableChannel
 import de.joekoe.simplefs.internal.SingleFileFileSystem
+import de.joekoe.simplefs.internal.copyTo
 import de.joekoe.simplefs.internal.directory.DirectoryBlock
 import de.joekoe.simplefs.internal.directory.DirectoryEntry
-import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.channels.ReadableByteChannel
 import java.nio.channels.WritableByteChannel
@@ -19,11 +19,15 @@ public class FileNode internal constructor(
 
     override val name: String get() = segment.toString()
     override val absolutePath: AbsolutePath get() = parent.absolutePath.child(segment)
+    private var deleted = false
 
-    private fun requireNotDeleted() =
-        checkNotNull(parent.get(absolutePath.lastSegment) as? DirectoryEntry.FilePointer) {
+    private fun requireNotDeleted(): DirectoryEntry.FilePointer {
+        check(!deleted) { "File has already been deleted" }
+
+        return checkNotNull(parent.get(absolutePath.lastSegment) as? DirectoryEntry.FilePointer) {
             "File has already been deleted"
         }
+    }
 
     public fun writeChannel(): WritableByteChannel {
         val pointer = requireNotDeleted()
@@ -35,14 +39,7 @@ public class FileNode internal constructor(
 
     public fun appendChannel(): WritableByteChannel {
         val wc = writeChannel()
-        readChannel()
-            .use { rc ->
-                val buf = ByteBuffer.allocate(8 * 1024)
-                while (rc.read(buf) != -1) {
-                    buf.rewind()
-                    wc.write(buf)
-                }
-            }
+        readChannel().use { it.copyTo(wc) }
         return wc
     }
 
@@ -65,6 +62,7 @@ public class FileNode internal constructor(
 
     override fun delete() {
         fileSystem.delete(this)
+        deleted = true
     }
 
     override fun equals(other: Any?): Boolean {
@@ -81,5 +79,17 @@ public class FileNode internal constructor(
         var result = fileSystem.hashCode()
         result = 31 * result + absolutePath.hashCode()
         return result
+    }
+
+    override fun toString(): String = buildString {
+        append("FileNode(")
+        append("absolutePath="); append(absolutePath)
+        append(", deleted="); append(deleted)
+        if (!deleted) {
+            val pointer = requireNotDeleted()
+            append(", offset=", pointer.offset)
+            append(", size=", pointer.size)
+        }
+        append(')')
     }
 }

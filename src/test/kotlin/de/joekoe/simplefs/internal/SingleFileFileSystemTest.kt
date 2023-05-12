@@ -51,6 +51,54 @@ class SingleFileFileSystemTest {
         SimpleFileSystem(fsPath).use(::compareProjectWithFs)
     }
 
+    @Test
+    fun `compacting should preserve data integrity`() = withFileSystem { source ->
+        copyProjectToFileSystem(source)
+
+        withFileSystem { target ->
+            source.compactTo(target)
+
+            val sourceEntries = source.breadthFirstTraversal()
+                .map { it.absolutePath.toString() }
+                .toSortedSet()
+            val targetEntries = target.breadthFirstTraversal()
+                .map { it.absolutePath.toString() }
+                .toSortedSet()
+            assertEquals(sourceEntries, targetEntries)
+
+            assertSequenceEquals(
+                source.breadthFirstTraversal(),
+                target.breadthFirstTraversal()
+            ) { fromSource, fromTarget ->
+                assertEquals(fromSource.absolutePath, fromTarget.absolutePath)
+                assertEquals(fromSource.name, fromTarget.name)
+                when (fromSource) {
+                    is DirectoryNode -> assertIs<DirectoryNode>(fromTarget)
+
+                    is FileNode -> {
+                        assertIs<FileNode>(fromTarget)
+                        assertContentEquals(
+                            fromSource.readChannel().consumeBytes(),
+                            fromTarget.readChannel().consumeBytes()
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private inline fun <T> assertSequenceEquals(
+        expected: Sequence<T>,
+        actual: Sequence<T>,
+        assert: (e: T, a: T) -> Unit
+    ) {
+        val aList = actual.toList()
+        val eList = expected.toList()
+
+        assertEquals(eList.size, aList.size)
+        eList.zip(aList, assert)
+    }
+
     private fun copyProjectToFileSystem(fs: SimpleFileSystem) {
         allFilesInProject()
             .forEach { path ->

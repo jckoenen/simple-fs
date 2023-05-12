@@ -28,16 +28,20 @@ public class DirectoryNode internal constructor(
                 fileSystem.open(path)
             }
 
+    public fun open(pathSegment: SimplePath.Segment): SimpleFileSystemNode? =
+        fileSystem.open(absolutePath.child(pathSegment))
+
     override fun moveTo(directory: DirectoryNode) {
         require(absolutePath != SimplePath.ROOT) { "Cannot move root directory" }
         block.absolutePath = fileSystem.moveTo(this, directory.absolutePath).first
     }
 
     override fun rename(name: SimplePath.Segment) {
-        fileSystem.rename(this, name)
+        block.absolutePath = fileSystem.rename(this, name)
     }
 
     override fun delete() {
+        children().forEach(fileSystem::delete)
         fileSystem.delete(this)
     }
 
@@ -56,4 +60,6 @@ public class DirectoryNode internal constructor(
         result = 31 * result + absolutePath.hashCode()
         return result
     }
+
+    override fun toString(): String = "DirectoryNode(absolutePath=$absolutePath)"
 }

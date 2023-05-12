@@ -19,9 +19,15 @@ internal class SingleFileFileSystem(
 
     private val channel: FileChannel = container.channel
 
-    private val root = DirectoryBlock(channel, 0, SimplePath.ROOT)
+    private val rootBlock = DirectoryBlock(channel, 0, SimplePath.ROOT)
+    private val rootNode = DirectoryNode(rootBlock, this)
+
     private val blocks = mutableMapOf<SimplePath, DirectoryBlock?>().also {
-        it[SimplePath.ROOT] = root
+        it[SimplePath.ROOT] = rootBlock
+    }
+    private val files = WeakValueMap<AbsolutePath, FileNode>()
+    private val directories = WeakValueMap<AbsolutePath, DirectoryNode>().also {
+        it[SimplePath.ROOT] = rootNode
     }
 
     override fun createDirectory(path: AbsolutePath): DirectoryNode {
@@ -34,10 +40,13 @@ internal class SingleFileFileSystem(
 
         val pos = channel.size()
         val block = DirectoryBlock(channel, pos, path)
+        val node = DirectoryNode(block, this)
+
         parent.addOrReplace(DirectoryPointer(path.lastSegment, pos))
         blocks[path] = block
+        directories[path] = node
 
-        return DirectoryNode(block, this)
+        return node
     }
 
     override fun createFile(path: AbsolutePath): FileNode {
@@ -51,10 +60,16 @@ internal class SingleFileFileSystem(
         val pos = channel.size()
         parent.addOrReplace(FilePointer(path.lastSegment, pos, 0))
 
-        return FileNode(path.lastSegment, channel, parent, this)
+        val node = FileNode(path.lastSegment, channel, parent, this)
+        files[path] = node
+
+        return node
     }
 
     override fun open(path: AbsolutePath): SimpleFileSystemNode? {
+        val existing = files[path] ?: directories[path]
+        if (existing != null) return existing
+
         val parent = parentBlockOf(path) ?: return null
         return when (parent.get(path.lastSegment)) {
             null -> null
@@ -90,9 +105,9 @@ internal class SingleFileFileSystem(
         newParent.addOrReplace(oldPointer)
         oldParent.delete(node.absolutePath.lastSegment)
         val newPath = path.child(node.absolutePath.lastSegment)
-        blocks.remove(node.absolutePath)?.let {
-            blocks[path.child(node.absolutePath.lastSegment)] = it
-        }
+
+        blocks.reKey(node.absolutePath, newPath)
+        nodeCache(node).reKey(node.absolutePath, newPath)
 
         return newPath to newParent
     }
@@ -106,7 +121,8 @@ internal class SingleFileFileSystem(
         val oldPointer = checkNotNull(parent.get(oldName)) { "Node no longer linked to parent" }
 
         parent.addOrReplace(oldPointer.withNewName(name))
-        blocks.remove(node.absolutePath)?.let { blocks[newPath] = it }
+        blocks.reKey(node.absolutePath, newPath)
+        nodeCache(node).reKey(node.absolutePath, newPath)
 
         return newPath
     }
@@ -115,17 +131,18 @@ internal class SingleFileFileSystem(
         val parent = requireNotNull(parentBlockOf(node.absolutePath)) {
             "Parent directory doesn't exist"
         }
-        parent.delete(node.absolutePath.lastSegment)
+        nodeCache(node).remove(node.absolutePath)
         blocks.remove(node.absolutePath)
+        parent.delete(node.absolutePath.lastSegment)
     }
 
     private fun parentBlockOf(path: AbsolutePath): DirectoryBlock? =
         path.parent()
             ?.allSubPaths()
-            ?.fold(root) { block, subPath ->
+            ?.fold(rootBlock) { block, subPath ->
                 blockAt(subPath, parent = block) ?: return@parentBlockOf null
             }
-            ?: root
+            ?: rootBlock
 
     private fun blockAt(path: AbsolutePath, parent: DirectoryBlock): DirectoryBlock? =
         blocks.computeIfAbsent(path) {
@@ -133,9 +150,46 @@ internal class SingleFileFileSystem(
             pointer?.let { DirectoryBlock(channel, it.offset, path) }
         }
 
+    @Suppress("UNCHECKED_CAST")
+    private fun <T : SimpleFileSystemNode> nodeCache(node: T): WeakValueMap<AbsolutePath, T> = when (node) {
+        is DirectoryNode -> directories as WeakValueMap<AbsolutePath, T>
+        is FileNode -> files as WeakValueMap<AbsolutePath, T>
+        else -> error("No nodecache registered for $node")
+    }
+
     override fun compact() {
         TODO("Not yet implemented")
     }
+
+    internal fun compactTo(other: SingleFileFileSystem) {
+        breadthFirstTraversal()
+            .drop(1) // no need to copy the root
+            .forEach { node ->
+                when (node) {
+                    is DirectoryNode -> other.createDirectory(node.absolutePath)
+                    is FileNode -> {
+                        other.createFile(node.absolutePath)
+                            .writeChannel()
+                            .use { wc ->
+                                node.readChannel().use { it.copyTo(wc) }
+                            }
+                    }
+                }
+            }
+    }
+
+    internal fun breadthFirstTraversal(start: SimpleFileSystemNode = rootNode): Sequence<SimpleFileSystemNode> =
+        sequence {
+            val q = ArrayDeque<SimpleFileSystemNode>()
+            q.add(start)
+            while (q.isNotEmpty()) {
+                val node = q.removeFirst()
+                if (node is DirectoryNode) {
+                    q.addAll(node.children().toList())
+                }
+                yield(node)
+            }
+        }
 
     override fun close() = channel.close()
 }

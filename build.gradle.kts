@@ -1,7 +1,7 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
-    kotlin("jvm") version "1.8.20"
+    kotlin("jvm") version "1.9.21"
     id("org.jlleitschuh.gradle.ktlint") version "11.3.2"
     `maven-publish`
 }
@@ -43,5 +43,5 @@ tasks.test {
 
 kotlin {
     explicitApi()
-    jvmToolchain(11)
+    jvmToolchain(21)
 }
